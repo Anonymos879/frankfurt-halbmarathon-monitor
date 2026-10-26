@@ -1,0 +1,53 @@
+
+name: Frankfurt Halbmarathon Startplatz-Monitor
+
+on:
+  schedule:
+    - cron: '3/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      test:
+        description: 'Telegram-Testnachricht senden?'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frankfurt-halbmarathon-monitor
+  cancel-in-progress: false
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dateien laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Letzten Status laden
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: ticket-status-${{ github.run_id }}
+          restore-keys: |
+            ticket-status-
+
+      - name: Startplatz pruefen
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEND_TEST_MESSAGE: ${{ inputs.test }}
+        run: python monitor.py
+
+      - name: Status speichern
+        if: ${{ hashFiles('state_updated.txt') != '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: ticket-status-${{ github.run_id }}
